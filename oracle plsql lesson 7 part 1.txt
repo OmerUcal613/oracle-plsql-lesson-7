@@ -1,0 +1,412 @@
+CREATE TABLE customers (
+    customerid INT PRIMARY KEY,
+    firstname  VARCHAR2(50),
+    lastname   VARCHAR2(50),
+    age        INT
+);
+
+CREATE TABLE orders (
+    orderid    INT PRIMARY KEY,
+    customerid INT,
+    orderdate  DATE,
+    amount     DECIMAL(10, 2),
+    FOREIGN KEY ( customerid )
+        REFERENCES customers ( customerid )
+);
+
+INSERT INTO customers (
+    customerid,
+    firstname,
+    lastname,
+    age
+) VALUES ( 1,
+           'Ali',
+           'Mammadov',
+           30 );
+
+INSERT INTO customers (
+    customerid,
+    firstname,
+    lastname,
+    age
+) VALUES ( 2,
+           'Leyla',
+           'Huseynova',
+           25 );
+
+INSERT INTO orders (
+    orderid,
+    customerid,
+    orderdate,
+    amount
+) VALUES ( 1,
+           1,
+           TO_DATE('2025-02-01', 'YYYY-MM-DD'),
+           200.50 );
+
+INSERT INTO orders (
+    orderid,
+    customerid,
+    orderdate,
+    amount
+) VALUES ( 2,
+           2,
+           TO_DATE('2025-02-05', 'YYYY-MM-DD'),
+           150.75 );
+
+COMMIT;
+
+SET SERVEROUTPUT ON;
+
+-- 1. Müştərilər haqqında məlumatı sadə SELECT ilə almaq
+DECLARE
+    v_firstname VARCHAR2(50);
+    v_lastname  VARCHAR2(50);
+BEGIN
+    SELECT
+        firstname,
+        lastname
+    INTO
+        v_firstname,
+        v_lastname
+    FROM
+        customers
+    WHERE
+        customerid = 1;
+
+    dbms_output.put_line('Müştəri: '
+                         || v_firstname
+                         || ' '
+                         || v_lastname);
+END;
+/
+
+SELECT
+    firstname,
+    lastname
+FROM
+    customers
+WHERE
+    customerid = 1;
+
+
+
+-- 2. Müştəri və onların sifarişləri ilə əlaqəli məlumatları birləşdirərək almaq
+DECLARE
+    v_firstname VARCHAR2(50);
+    v_lastname  VARCHAR2(50);
+    v_orderdate DATE;
+    v_amount    DECIMAL(10, 2);
+BEGIN
+    FOR r IN (
+        SELECT
+            c.firstname,
+            c.lastname,
+            o.orderdate,
+            o.amount
+        FROM
+                 customers c
+            JOIN orders o ON c.customerid = o.customerid
+    ) LOOP
+        dbms_output.put_line('Müştəri: '
+                             || r.firstname
+                             || ' '
+                             || r.lastname
+                             || ', Sifariş tarixi: '
+                             || to_char(r.orderdate, 'YYYY-MM-DD')
+                             || ', Məbləğ: '
+                             || r.amount);
+    END LOOP;
+END;
+/
+
+SELECT
+    c.firstname,
+    c.lastname,
+    o.orderdate,
+    o.amount
+FROM
+         customers c
+    JOIN orders o ON c.customerid = o.customerid;
+
+
+
+-- 3. SELECT bəyanatları ilə toplama əməliyyatı:
+DECLARE
+    v_total_amount DECIMAL(10, 2);
+BEGIN
+    SELECT
+        SUM(amount)
+    INTO v_total_amount
+    FROM
+        orders;
+
+    dbms_output.put_line('Ümumi sifariş məbləği: ' || v_total_amount);
+END;
+/
+
+SELECT
+    SUM(amount)
+FROM
+    orders;
+
+
+
+-- 4. Müştəri haqqında məlumatın yoxlanılması
+DECLARE
+    v_age     INT;
+    v_message VARCHAR2(100);
+BEGIN
+    SELECT
+        age
+    INTO v_age
+    FROM
+        customers
+    WHERE
+        customerid = 1;
+
+    IF v_age < 30 THEN
+        v_message := 'Gənc müştəri!';
+    ELSE
+        v_message := 'Yetişkin müştəri!';
+    END IF;
+
+    dbms_output.put_line(v_message);
+END;
+/
+
+SELECT
+    age
+FROM
+    customers
+WHERE
+    customerid = 1;
+
+
+
+-- 5. Sifarişlərin sayını hesablamaq
+DECLARE
+    v_order_count INT;
+BEGIN
+    SELECT
+        COUNT(*)
+    INTO v_order_count
+    FROM
+        orders;
+
+    dbms_output.put_line('Ümumi sifariş sayı: ' || v_order_count);
+END;
+/
+
+SELECT
+    COUNT(*)
+FROM
+    orders;
+
+
+
+-- 6. Müştəriyə görə sifariş məbləğini hesablamaq
+DECLARE
+    v_total_amount DECIMAL(10, 2);
+BEGIN
+    FOR r IN (
+        SELECT
+            c.firstname,
+            c.lastname,
+            SUM(o.amount) AS totalamount
+        FROM
+                 customers c
+            JOIN orders o ON c.customerid = o.customerid
+        GROUP BY
+            c.firstname,
+            c.lastname
+    ) LOOP
+        dbms_output.put_line('Müştəri: '
+                             || r.firstname
+                             || ' '
+                             || r.lastname
+                             || ', Ümumi sifariş məbləği: '
+                             || r.totalamount);
+    END LOOP;
+END;
+/
+
+SELECT
+    c.firstname,
+    c.lastname,
+    SUM(o.amount) AS totalamount
+FROM
+         customers c
+    JOIN orders o ON c.customerid = o.customerid
+GROUP BY
+    c.firstname,
+    c.lastname;
+
+
+
+-- 7. Son sifarişi tapmaq
+DECLARE
+    v_last_order_date DATE;
+BEGIN
+    SELECT
+        MAX(orderdate)
+    INTO v_last_order_date
+    FROM
+        orders
+    WHERE
+        customerid = 1;
+
+    dbms_output.put_line('Son sifariş tarixi: ' || to_char(v_last_order_date, 'YYYY-MM-DD'));
+END;
+/
+
+SELECT
+    MAX(orderdate)
+FROM
+    orders
+WHERE
+    customerid = 1;
+
+
+
+-- 8. SELECT ilə alt sorğu (Subquery) istifadə etmək
+DECLARE
+    v_amount DECIMAL(10, 2);
+BEGIN
+    SELECT
+        amount
+    INTO v_amount
+    FROM
+        orders
+    WHERE
+            customerid = (
+                SELECT
+                    customerid
+                FROM
+                    customers
+                WHERE
+                        age > 30
+                    AND firstname = 'Ali'
+                    AND lastname = 'Mammadov'
+            )
+        AND ROWNUM = 1;
+
+    dbms_output.put_line('Sifariş məbləği: ' || v_amount);
+END;
+/
+
+SELECT
+    amount
+FROM
+    orders
+WHERE
+        customerid = (
+            SELECT
+                customerid
+            FROM
+                customers
+            WHERE
+                    age = 30
+                AND firstname = 'Ali'
+                AND lastname = 'Mammadov'
+        )
+    AND ROWNUM = 1;
+
+SELECT
+    *
+FROM
+    customers;
+
+SELECT
+    *
+FROM
+    orders;
+
+
+
+-- 9. Bir neçə cədvəldən məlumatı birləşdirmək ( JOIN )
+DECLARE
+    v_firstname VARCHAR2(50);
+    v_lastname  VARCHAR2(50);
+    v_orderid   INT;
+    v_orderdate DATE;
+    v_amount    DECIMAL(10, 2);
+BEGIN
+    FOR r IN (
+        SELECT
+            c.firstname,
+            c.lastname,
+            o.orderid,
+            o.orderdate,
+            o.amount
+        FROM
+                 customers c
+            JOIN orders o ON c.customerid = o.customerid
+        WHERE
+            c.age > 25
+    ) LOOP
+        dbms_output.put_line('Müştəri: '
+                             || r.firstname
+                             || ' '
+                             || r.lastname
+                             || ', Sifariş ID: '
+                             || r.orderid
+                             || ', Sifariş tarixi: '
+                             || to_char(r.orderdate, 'YYYY-MM-DD')
+                             || ', Məbləğ: '
+                             || r.amount);
+    END LOOP;
+END;
+/
+
+SELECT
+    c.firstname,
+    c.lastname,
+    o.orderid,
+    o.orderdate,
+    o.amount
+FROM
+         customers c
+    JOIN orders o ON c.customerid = o.customerid
+WHERE
+    c.age > 25;
+
+
+
+-- 10. Dəyişənlərə SELECT ilə çoxlu dəyər təyin etmək
+DECLARE
+    v_firstname VARCHAR2(50);
+    v_lastname  VARCHAR2(50);
+    v_age       INT;
+BEGIN
+    SELECT
+        firstname,
+        lastname,
+        age
+    INTO
+        v_firstname,
+        v_lastname,
+        v_age
+    FROM
+        customers
+    WHERE
+        customerid = 2;
+
+    dbms_output.put_line('Müştəri: '
+                         || v_firstname
+                         || ' '
+                         || v_lastname
+                         || ', Yaş: '
+                         || v_age);
+
+END;
+/
+
+SELECT
+    firstname,
+    lastname,
+    age
+FROM
+    customers
+WHERE
+    customerid = 2;
